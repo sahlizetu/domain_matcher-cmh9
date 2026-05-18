@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Domain Matcher Tool</title>
+  <style>
+    :root{
+      --bg:#f4f7fb; --card:#ffffff; --text:#172033; --muted:#64748b;
+      --blue:#4f8ef7; --green:#00a878; --purple:#8b5cf6; --border:#d9e2ef;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text);padding:30px}
+    .container{max-width:1300px;margin:auto}
+    h1{margin:0 0 8px;font-size:32px}
+    p{margin:0 0 22px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 4px 18px rgba(0,0,0,.05)}
+    label{display:block;font-weight:700;margin-bottom:8px;font-size:14px}
+    textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--border);border-radius:10px;padding:12px;font-family:Consolas,monospace;font-size:14px;line-height:1.6;outline:none}
+    textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,142,247,.12)}
+    .options{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0;align-items:center}
+    .option{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:14px}
+    button{border:none;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer;font-size:14px}
+    .btn-main{background:var(--blue);color:white}
+    .btn-copy{background:var(--green);color:white}
+    .btn-principal{background:var(--purple);color:white}
+    .btn-clear{background:#e2e8f0;color:#334155}
+    .stats{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+    .pill{background:white;border:1px solid var(--border);border-radius:999px;padding:7px 12px;font-size:13px;color:var(--muted)}
+    .pill b{color:var(--text)}
+    .output-card{margin-top:18px}
+    .hint{font-size:12px;color:var(--muted);margin-top:8px}
+    .footer{text-align:center;color:var(--muted);font-size:13px;margin:22px 0 4px;font-weight:600}
+    @media(max-width:800px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Domain Matcher Tool</h1>
+    <p>Colle ta grande liste dans Zone 1, puis colle les domaines à chercher dans Zone 2. Le tool sort uniquement les lignes correspondantes.</p>
+
+    <div class="grid">
+      <div class="card">
+        <label for="zone1">Zone 1 — Data principale</label>
+        <textarea id="zone1" spellcheck="false" placeholder="domain1.com    central.com    sub.central.com"></textarea>
+        <div class="hint">Chaque ligne doit contenir 3 colonnes séparées par tabulation ou espaces. Recherche possible par colonne 1, 2 ou 3.</div>
+      </div>
+
+      <div class="card">
+        <label for="zone2">Zone 2 — Domaines à chercher</label>
+        <textarea id="zone2" spellcheck="false" placeholder="central.com\nsub.central.com"></textarea>
+        <div class="hint">Mets un domaine par ligne. Le tool cherche dans colonne 1, colonne 2 et colonne 3, avec domain principal ou subdomain.</div>
+      </div>
+    </div>
+
+    <div class="options">
+      <label class="option"><input type="checkbox" id="checkCol2" checked /> Chercher dans colonne 2</label>
+      <label class="option"><input type="checkbox" id="checkCol3" checked /> Chercher dans colonne 3</label>
+      <label class="option"><input type="checkbox" id="removeDuplicates" checked /> Supprimer les doublons résultat</label>
+      <button class="btn-main" onclick="filterDomains()">Filtrer</button>
+      <button class="btn-principal" onclick="keepPrincipalDomains()">Garder domaines principaux</button>
+      <button class="btn-copy" onclick="copyOutput()">Copier résultat</button>
+      <button class="btn-clear" onclick="clearAll()">Effacer</button>
+    </div>
+
+    <div class="stats">
+      <div class="pill">Lignes Zone 1 : <b id="statLines">0</b></div>
+      <div class="pill">Domaines Zone 2 : <b id="statSearch">0</b></div>
+      <div class="pill">Résultats : <b id="statResults">0</b></div>
+      <div class="pill">Ignorées : <b id="statIgnored">0</b></div>
+    </div>
+
+    <div class="card output-card">
+      <label for="output">Output — lignes trouvées</label>
+      <textarea id="output" spellcheck="false" readonly placeholder="Le résultat apparaîtra ici..."></textarea>
+      <div class="hint">Bouton “Garder domaines principaux” = garde seulement la première colonne de chaque ligne.</div>
+    </div>
+
+    <div class="footer">Created by CMH9 admin</div>
+  </div>
+
+  <script>
+    function getLines(id){
+      return document.getElementById(id).value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    }
+
+    function normalizeDomain(v){
+      return v.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+    }
+
+    function filterDomains(){
+      const zone1 = getLines('zone1');
+      const zone2 = getLines('zone2').map(normalizeDomain).filter(Boolean);
+      const searchList = [...new Set(zone2)];
+
+      const checkCol2 = document.getElementById('checkCol2').checked;
+      const checkCol3 = document.getElementById('checkCol3').checked;
+      const removeDuplicates = document.getElementById('removeDuplicates').checked;
+
+      const result = [];
+      const seen = new Set();
+      let ignored = 0;
+
+      function isDomainMatch(value){
+        const domain = normalizeDomain(value);
+        if(!domain) return false;
+
+        return searchList.some(search => {
+          if(!search) return false;
+
+          // Exact match
+          if(domain === search) return true;
+
+          // Subdomain match: newsletters.rtmediagroup.com matches rtmediagroup.com
+          if(domain.endsWith('.' + search)) return true;
+          if(search.endsWith('.' + domain)) return true;
+
+          // Extra flexible match for copied data with prefixes/suffixes
+          if(domain.includes(search) || search.includes(domain)) return true;
+
+          return false;
+        });
+      }
+
+      zone1.forEach(line => {
+        const parts = line.split(/\s+/).map(x => x.trim()).filter(Boolean);
+
+        if(parts.length < 3){
+          ignored++;
+          return;
+        }
+
+        const col1 = parts[0];
+        const col2 = parts[1];
+        const col3 = parts[2];
+
+        // Colonne 1 toujours cherchée + colonnes 2/3 selon options
+        const matchCol1 = isDomainMatch(col1);
+        const matchCol2 = checkCol2 && isDomainMatch(col2);
+        const matchCol3 = checkCol3 && isDomainMatch(col3);
+
+        if(matchCol1 || matchCol2 || matchCol3){
+          if(removeDuplicates){
+            const key = line.toLowerCase();
+            if(!seen.has(key)){
+              seen.add(key);
+              result.push(line);
+            }
+          }else{
+            result.push(line);
+          }
+        }
+      });
+
+      document.getElementById('output').value = result.join('\n');
+      document.getElementById('statLines').textContent = zone1.length;
+      document.getElementById('statSearch').textContent = zone2.length;
+      document.getElementById('statResults').textContent = result.length;
+      document.getElementById('statIgnored').textContent = ignored;
+    }
+
+    function keepPrincipalDomains(){
+      const outputLines = getLines('output');
+      if(!outputLines.length) return alert('Aucun résultat à transformer.');
+
+      const principals = [];
+      const seen = new Set();
+
+      outputLines.forEach(line => {
+        const parts = line.split(/\s+/).map(x => x.trim()).filter(Boolean);
+        if(parts.length < 1) return;
+
+        const principal = parts[0];
+        const key = principal.toLowerCase();
+
+        if(!seen.has(key)){
+          seen.add(key);
+          principals.push(principal);
+        }
+      });
+
+      document.getElementById('output').value = principals.join('\n');
+      document.getElementById('statResults').textContent = principals.length;
+    }
+
+    function copyOutput(){
+      const output = document.getElementById('output').value;
+      if(!output.trim()) return alert('Aucun résultat à copier.');
+      navigator.clipboard.writeText(output).then(() => alert('Résultat copié ✅'));
+    }
+
+    function clearAll(){
+      document.getElementById('zone1').value = '';
+      document.getElementById('zone2').value = '';
+      document.getElementById('output').value = '';
+      document.getElementById('statLines').textContent = '0';
+      document.getElementById('statSearch').textContent = '0';
+      document.getElementById('statResults').textContent = '0';
+      document.getElementById('statIgnored').textContent = '0';
+    }
+
+    document.getElementById('zone1').value =
+`londoncarpetandflooring.co.uk\trightcarpetsandflooring.co.uk\trightcarpetsandflooring.co.uk
+borgoantiergecorestaurant.com\tborgoantinorestaurant.com\twww.borgoantinorestaurant.com
+borgoantiergezefzcorestaurant.com\tborgoantinorestaurant.com\twww.borgoantinorestaurant.com
+pepesmugrgrltiservicios.com\tmundocarga.com\tpepesmultiservicios.mundocarga.com
+tatianatretyak.com\tcmcommercetatianatretyak.com\tcmcommercetatianatretyak.com
+tatianatrefzefetyak.com\tcmcommercetatianatretyak.com\tcmcommercetatianatretyak.com
+pepesmurgrgltiservicios.com\tcmcommercetatianatretyak.com\tcmcommercetatianatretyak.com
+rtmediagroup.com`;
+
+    document.getElementById('zone2').value =
+`rightcarpetsandflooring.co.uk
+cmcommercetatianatretyak.com
+rtmediagroup.com`;
+  </script>
+</body>
+</html>
