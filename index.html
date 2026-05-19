@@ -43,13 +43,13 @@
     <div class="grid">
       <div class="card">
         <label for="zone1">Zone 1 — Data principale</label>
-        <textarea id="zone1" spellcheck="false" placeholder="domain1.com    central.com    sub.central.com"></textarea>
+        <textarea id="zone1" spellcheck="false" placeholder="DomPrincipal domInc SubDomInc"></textarea>
         <div class="hint">Chaque ligne doit contenir 3 colonnes séparées par tabulation ou espaces. Recherche possible par colonne 1, 2 ou 3.</div>
       </div>
 
       <div class="card">
         <label for="zone2">Zone 2 — Domaines à chercher</label>
-        <textarea id="zone2" spellcheck="false" placeholder="central.com\nsub.central.com"></textarea>
+        <textarea id="zone2" spellcheck="false" placeholder="search by DomPrincipal or domInc or SubDomInc"></textarea>
         <div class="hint">Mets un domaine par ligne. Le tool cherche dans colonne 1, colonne 2 et colonne 3, avec domain principal ou subdomain.</div>
       </div>
     </div>
@@ -200,11 +200,9 @@
       document.getElementById('statIgnored').textContent = '0';
     }
 
-    document.getElementById('zone1').value =
-`DomPrincipal domInc SubDomInc`;
+    document.getElementById('zone1').value =``;
 
-    document.getElementById('zone2').value =
-`search by DomPrincipal or domInc or SubDomInc `;
+    document.getElementById('zone2').value =``;
   </script>
 </body>
 </html>
